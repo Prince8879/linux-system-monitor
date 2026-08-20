@@ -12,6 +12,7 @@ def get_system_info():
     boot_time = datetime.datetime.fromtimestamp(psutil.boot_time())
     current_time = datetime.datetime.now()
     uptime = current_time - boot_time
+    uptime = str(uptime).split(".")[0]
 
     return cpu_usage, memory.percent, disk.percent, uptime
 
@@ -20,11 +21,14 @@ def get_network_info():
     network_info = psutil.net_if_addrs()
 
     for interface, addresses in network_info.items():
-        print(f"\n{interface}")
-
         for address in addresses:
             if address.family == 2:
-                print(f"  IPv4: {address.address}")
+                ip = address.address
+
+                if ip.startswith("169.254.") or ip == "127.0.0.1":
+                    continue
+
+                print(f"{interface:<35}: {ip}")
 
 
 def get_status(usage):
@@ -37,15 +41,16 @@ def get_status(usage):
 
 
 def check_warnings(cpu_usage, memory_usage, disk_usage):
-    print("\nResource Status:")
+    print("\nRESOURCE STATUS")
+    print("-" * 55)
 
     cpu_status = get_status(cpu_usage)
     ram_status = get_status(memory_usage)
     disk_status = get_status(disk_usage)
 
-    print(f"CPU:  {cpu_usage}%  [{cpu_status}]")
-    print(f"RAM:  {memory_usage}%  [{ram_status}]")
-    print(f"Disk: {disk_usage}%  [{disk_status}]")
+    print(f"CPU Usage       : {cpu_usage:5.1f}%  [{cpu_status}]")
+    print(f"RAM Usage       : {memory_usage:5.1f}%  [{ram_status}]")
+    print(f"Disk Usage      : {disk_usage:5.1f}%  [{disk_status}]")
 
 def watch_mode(interval):
     try:
@@ -87,21 +92,28 @@ def parse_arguments():
 
 
 def display_dashboard():
-    print("=" * 50)
-    print("        LINUX SYSTEM MONITOR")
-    print("=" * 50)
+    print("=" * 55)
+    print("             LINUX SYSTEM MONITOR")
+    print("=" * 55)
 
     cpu, ram, disk, uptime = get_system_info()
 
-    print(f"CPU Usage: {cpu}%")
-    print(f"RAM Usage: {ram}%")
-    print(f"Disk Usage: {disk}%")
-    print(f"System Uptime: {uptime}")
+    print("\nSYSTEM OVERVIEW")
+    print("-" * 55)
 
-    print("\nNetwork Interfaces:")
+    print(f"CPU Usage       : {cpu:5.1f}%")
+    print(f"RAM Usage       : {ram:5.1f}%")
+    print(f"Disk Usage      : {disk:5.1f}%")
+    print(f"System Uptime   : {uptime}")
+
+    print("\nNETWORK")
+    print("-" * 55)
+
     get_network_info()
 
     check_warnings(cpu, ram, disk)
+
+    print("\n" + "=" * 55)
 
 
 if __name__ == "__main__":
