@@ -56,6 +56,7 @@ def watch_mode(interval):
     except KeyboardInterrupt:
         print("\n\nMonitoring stopped.")
 
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="A lightweight system monitoring tool."
@@ -71,10 +72,16 @@ def parse_arguments():
         "--interval",
         type=int,
         default=5,
+        metavar="SECONDS",
         help="Refresh interval in seconds. Default: 5"
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.interval <= 0:
+        parser.error("interval must be greater than 0")
+
+    return args
 
 
 def display_dashboard():
