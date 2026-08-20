@@ -27,23 +27,25 @@ def get_network_info():
                 print(f"  IPv4: {address.address}")
 
 
+def get_status(usage):
+    if usage > 80:
+        return "WARNING"
+    elif usage >= 70:
+        return "NOTICE"
+    else:
+        return "OK"
+
+
 def check_warnings(cpu_usage, memory_usage, disk_usage):
-    print("\nSystem Warnings:")
+    print("\nResource Status:")
 
-    if cpu_usage > 80:
-        print("⚠️ WARNING: CPU usage is high!")
-    else:
-        print("CPU usage is normal.")
+    cpu_status = get_status(cpu_usage)
+    ram_status = get_status(memory_usage)
+    disk_status = get_status(disk_usage)
 
-    if memory_usage > 80:
-        print("⚠️ WARNING: RAM usage is high!")
-    else:
-        print("RAM usage is normal.")
-
-    if disk_usage > 80:
-        print("⚠️ WARNING: Disk usage is high!")
-    else:
-        print("Disk usage is normal.")
+    print(f"CPU:  {cpu_usage}%  [{cpu_status}]")
+    print(f"RAM:  {memory_usage}%  [{ram_status}]")
+    print(f"Disk: {disk_usage}%  [{disk_status}]")
 
 def watch_mode(interval):
     try:
