@@ -1,5 +1,7 @@
 # Linux System Monitor
 
+https://github.com/Prince8879/linux-system-monitor?utm_source=chatgpt.com
+
 A lightweight system monitoring tool built with Python and psutil.
 
 ## Features
