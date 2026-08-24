@@ -438,6 +438,57 @@ def check_warnings(
     )
 
 
+def calculate_health_score(cpu, ram, disk):
+    def resource_score(usage):
+        if usage >= 100:
+            return 0
+
+        return max(0, 100 - usage)
+
+    cpu_score = resource_score(cpu)
+    ram_score = resource_score(ram)
+    disk_score = resource_score(disk)
+
+    score = (
+        (cpu_score * 0.35)
+        + (ram_score * 0.40)
+        + (disk_score * 0.25)
+    )
+
+    return round(score)
+
+
+def get_health_status(score):
+    if score >= 80:
+        return "GOOD"
+
+    if score >= 60:
+        return "NOTICE"
+
+    if score >= 40:
+        return "WARNING"
+
+    return "CRITICAL"
+
+
+def display_health_score(cpu, ram, disk):
+    score = calculate_health_score(
+        cpu,
+        ram,
+        disk
+    )
+
+    status = get_health_status(score)
+
+    print("\nSYSTEM HEALTH")
+    print("-" * 55)
+
+    print(
+        f"Overall Health : "
+        f"{score}/100 [{status}]"
+    )
+
+
 def display_system_details(info):
     print("\nSYSTEM DETAILS")
     print("-" * 55)
@@ -501,6 +552,16 @@ def build_report():
 
     processes = get_process_info(10)
 
+    health_score = calculate_health_score(
+        info["cpu"],
+        info["ram"],
+        info["disk"]
+    )
+
+    health_status = get_health_status(
+        health_score
+    )
+
     report = {
         "timestamp": datetime.datetime.now().isoformat(
             timespec="seconds"
@@ -520,6 +581,10 @@ def build_report():
             "operating_system": info["os"],
             "os_release": info["os_release"],
             "machine": info["machine"],
+        },
+        "health": {
+            "score": health_score,
+            "status": health_status,
         },
         "network": {
             "interfaces": network_interfaces,
@@ -682,6 +747,12 @@ def display_dashboard():
     display_network_rates(1)
 
     check_warnings(
+        cpu,
+        ram,
+        disk
+    )
+
+    display_health_score(
         cpu,
         ram,
         disk
