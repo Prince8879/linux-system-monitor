@@ -185,6 +185,10 @@ The project is actively under development.
 
 ## License
 
-This project is currently intended as an open-source learning project.
+## License
 
-A formal license will be added in a future version.
+This project is licensed under the MIT License.
+
+Copyright (c) 2026 Prince Tiwari
+
+See the [LICENSE](LICENSE) file for the full license text.
