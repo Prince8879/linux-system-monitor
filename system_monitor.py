@@ -31,6 +31,64 @@ def get_network_info():
                 print(f"{interface:<35}: {ip}")
 
 
+def get_network_stats():
+    stats = psutil.net_io_counters()
+
+    return {
+        "bytes_sent": stats.bytes_sent,
+        "bytes_received": stats.bytes_recv,
+        "packets_sent": stats.packets_sent,
+        "packets_received": stats.packets_recv,
+    }
+
+def format_bytes(value):
+    units = ["B", "KB", "MB", "GB", "TB"]
+
+    size = float(value)
+
+    for unit in units:
+        if size < 1024:
+            return f"{size:.2f} {unit}"
+        size /= 1024
+
+    return f"{size:.2f} PB"
+
+
+def display_network_stats():
+    stats = get_network_stats()
+
+    print("\nNETWORK STATISTICS")
+    print("-" * 55)
+
+    print(f"{'Bytes Sent':<25}: {format_bytes(stats['bytes_sent'])}")
+    print(f"{'Bytes Received':<25}: {format_bytes(stats['bytes_received'])}")
+    print(f"{'Packets Sent':<25}: {stats['packets_sent']:,}")
+    print(f"{'Packets Received':<25}: {stats['packets_received']:,}")
+
+def get_network_rates(interval=1):
+    start = psutil.net_io_counters()
+
+    time.sleep(interval)
+
+    end = psutil.net_io_counters()
+
+    upload_rate = (end.bytes_sent - start.bytes_sent) / interval
+    download_rate = (end.bytes_recv - start.bytes_recv) / interval
+
+    return upload_rate, download_rate
+
+
+def display_network_rates(interval=1):
+    upload_rate, download_rate = get_network_rates(interval)
+
+    print("\nNETWORK SPEED")
+    print("-" * 55)
+
+    print(f"Upload Rate   : {format_bytes(upload_rate)}/s")
+    print(f"Download Rate : {format_bytes(download_rate)}/s")
+
+
+
 def get_process_info(limit=10):
     processes = []
 
@@ -181,6 +239,10 @@ def display_dashboard():
     print("-" * 55)
 
     get_network_info()
+
+    display_network_stats()
+
+    display_network_rates(1)
 
     check_warnings(cpu, ram, disk)
 
