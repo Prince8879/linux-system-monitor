@@ -18,6 +18,9 @@ CONFIG_FILE = Path("config.json")
 LOG_DIR = Path("logs")
 LOG_FILE = LOG_DIR / "monitor.log"
 
+REPORT_DIR = Path("reports")
+REPORT_FILE = REPORT_DIR / "system_report.json"
+
 
 CPU_WARNING_THRESHOLD = DEFAULT_CPU_WARNING_THRESHOLD
 RAM_WARNING_THRESHOLD = DEFAULT_RAM_WARNING_THRESHOLD
@@ -60,22 +63,13 @@ def load_config():
             DEFAULT_DISK_WARNING_THRESHOLD
         )
 
-        if (
-            isinstance(cpu, (int, float))
-            and 0 < cpu <= 100
-        ):
+        if isinstance(cpu, (int, float)) and 0 < cpu <= 100:
             CPU_WARNING_THRESHOLD = cpu
 
-        if (
-            isinstance(ram, (int, float))
-            and 0 < ram <= 100
-        ):
+        if isinstance(ram, (int, float)) and 0 < ram <= 100:
             RAM_WARNING_THRESHOLD = ram
 
-        if (
-            isinstance(disk, (int, float))
-            and 0 < disk <= 100
-        ):
+        if isinstance(disk, (int, float)) and 0 < disk <= 100:
             DISK_WARNING_THRESHOLD = disk
 
     except (
@@ -155,13 +149,16 @@ def get_system_info():
 
 
 def get_network_info():
+    network_interfaces = []
+
     try:
         network_info = psutil.net_if_addrs()
     except (OSError, AttributeError):
-        print("Unable to read network interface information.")
-        return
+        return network_interfaces
 
     for interface, addresses in network_info.items():
+        ipv4_addresses = []
+
         for address in addresses:
             if address.family == 2:
                 ip = address.address
@@ -169,7 +166,31 @@ def get_network_info():
                 if ip.startswith("169.254.") or ip == "127.0.0.1":
                     continue
 
-                print(f"{interface:<35}: {ip}")
+                ipv4_addresses.append(ip)
+
+        if ipv4_addresses:
+            network_interfaces.append(
+                {
+                    "interface": interface,
+                    "ipv4": ipv4_addresses,
+                }
+            )
+
+    return network_interfaces
+
+
+def display_network_info():
+    network_interfaces = get_network_info()
+
+    if not network_interfaces:
+        print("Unable to read network interface information.")
+        return
+
+    for network in network_interfaces:
+        print(
+            f"{network['interface']:<35}: "
+            f"{', '.join(network['ipv4'])}"
+        )
 
 
 def get_network_stats():
@@ -472,6 +493,82 @@ def display_system_details(info):
     )
 
 
+def build_report():
+    info = get_system_info()
+
+    network_stats = get_network_stats()
+    network_interfaces = get_network_info()
+
+    processes = get_process_info(10)
+
+    report = {
+        "timestamp": datetime.datetime.now().isoformat(
+            timespec="seconds"
+        ),
+        "system": {
+            "cpu_usage_percent": info["cpu"],
+            "ram_usage_percent": info["ram"],
+            "disk_usage_percent": info["disk"],
+            "uptime": info["uptime"],
+            "logical_cpu_cores": info["cpu_cores"],
+            "ram_total_bytes": info["ram_total"],
+            "ram_used_bytes": info["ram_used"],
+            "ram_available_bytes": info["ram_available"],
+            "disk_total_bytes": info["disk_total"],
+            "disk_used_bytes": info["disk_used"],
+            "disk_free_bytes": info["disk_free"],
+            "operating_system": info["os"],
+            "os_release": info["os_release"],
+            "machine": info["machine"],
+        },
+        "network": {
+            "interfaces": network_interfaces,
+            "bytes_sent": network_stats["bytes_sent"],
+            "bytes_received": network_stats["bytes_received"],
+            "packets_sent": network_stats["packets_sent"],
+            "packets_received": network_stats["packets_received"],
+        },
+        "processes": processes,
+        "thresholds": {
+            "cpu": CPU_WARNING_THRESHOLD,
+            "ram": RAM_WARNING_THRESHOLD,
+            "disk": DISK_WARNING_THRESHOLD,
+        },
+    }
+
+    return report
+
+
+def generate_report():
+    REPORT_DIR.mkdir(exist_ok=True)
+
+    report = build_report()
+
+    try:
+        with REPORT_FILE.open(
+            "w",
+            encoding="utf-8"
+        ) as file:
+            json.dump(
+                report,
+                file,
+                indent=4
+            )
+
+        print(
+            f"Report generated: {REPORT_FILE}"
+        )
+
+        return True
+
+    except OSError as error:
+        print(
+            f"Unable to generate report: {error}"
+        )
+
+        return False
+
+
 def watch_mode(interval):
     try:
         while True:
@@ -513,6 +610,12 @@ def parse_arguments():
         "--log",
         action="store_true",
         help="Enable local system usage logging."
+    )
+
+    parser.add_argument(
+        "--report",
+        action="store_true",
+        help="Generate a JSON system report."
     )
 
     args = parser.parse_args()
@@ -572,7 +675,7 @@ def display_dashboard():
     print("\nNETWORK")
     print("-" * 55)
 
-    get_network_info()
+    display_network_info()
 
     display_network_stats()
 
@@ -597,8 +700,11 @@ if __name__ == "__main__":
     if args.log:
         setup_logging()
 
+    if args.report:
+        generate_report()
+
     if args.watch:
         watch_mode(args.interval)
 
-    else:
+    elif not args.report:
         display_dashboard()
