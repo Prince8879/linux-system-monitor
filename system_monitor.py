@@ -1,7 +1,12 @@
-import argparse
+﻿import argparse
 import datetime
 import time
 import psutil
+
+
+CPU_WARNING_THRESHOLD = 80
+RAM_WARNING_THRESHOLD = 80
+DISK_WARNING_THRESHOLD = 80
 
 
 def get_system_info():
@@ -41,6 +46,7 @@ def get_network_stats():
         "packets_received": stats.packets_recv,
     }
 
+
 def format_bytes(value):
     units = ["B", "KB", "MB", "GB", "TB"]
 
@@ -49,6 +55,7 @@ def format_bytes(value):
     for unit in units:
         if size < 1024:
             return f"{size:.2f} {unit}"
+
         size /= 1024
 
     return f"{size:.2f} PB"
@@ -64,6 +71,7 @@ def display_network_stats():
     print(f"{'Bytes Received':<25}: {format_bytes(stats['bytes_received'])}")
     print(f"{'Packets Sent':<25}: {stats['packets_sent']:,}")
     print(f"{'Packets Received':<25}: {stats['packets_received']:,}")
+
 
 def get_network_rates(interval=1):
     start = psutil.net_io_counters()
@@ -86,7 +94,6 @@ def display_network_rates(interval=1):
 
     print(f"Upload Rate   : {format_bytes(upload_rate)}/s")
     print(f"Download Rate : {format_bytes(download_rate)}/s")
-
 
 
 def get_process_info(limit=10):
@@ -117,7 +124,6 @@ def get_process_info(limit=10):
         try:
             cpu_usage = process.cpu_percent(interval=None)
 
-            # Normalize process CPU usage to a 0-100% scale.
             cpu_usage = cpu_usage / cpu_count
 
             memory_usage = process.memory_percent()
@@ -142,7 +148,6 @@ def get_process_info(limit=10):
     return processes[:limit]
 
 
-
 def display_processes(limit=10):
     processes = get_process_info(limit)
 
@@ -160,10 +165,12 @@ def display_processes(limit=10):
         )
 
 
-def get_status(usage):
-    if usage > 80:
+def get_status(usage, warning_threshold=80):
+    notice_threshold = warning_threshold * 0.875
+
+    if usage > warning_threshold:
         return "WARNING"
-    elif usage >= 70:
+    elif usage >= notice_threshold:
         return "NOTICE"
     else:
         return "OK"
@@ -173,20 +180,26 @@ def check_warnings(cpu_usage, memory_usage, disk_usage):
     print("\nRESOURCE STATUS")
     print("-" * 55)
 
-    cpu_status = get_status(cpu_usage)
-    ram_status = get_status(memory_usage)
-    disk_status = get_status(disk_usage)
+    cpu_status = get_status(cpu_usage, CPU_WARNING_THRESHOLD)
+    ram_status = get_status(memory_usage, RAM_WARNING_THRESHOLD)
+    disk_status = get_status(disk_usage, DISK_WARNING_THRESHOLD)
 
     print(f"CPU Usage       : {cpu_usage:5.1f}%  [{cpu_status}]")
     print(f"RAM Usage       : {memory_usage:5.1f}%  [{ram_status}]")
     print(f"Disk Usage      : {disk_usage:5.1f}%  [{disk_status}]")
+
 
 def watch_mode(interval):
     try:
         while True:
             print("\033[2J\033[H")
             display_dashboard()
-            print(f"\nRefreshing in {interval} seconds... Press Ctrl+C to stop.")
+
+            print(
+                f"\nRefreshing in {interval} seconds..."
+                " Press Ctrl+C to stop."
+            )
+
             time.sleep(interval)
 
     except KeyboardInterrupt:
