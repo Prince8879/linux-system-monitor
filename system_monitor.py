@@ -1,12 +1,35 @@
 ﻿import argparse
 import datetime
+import logging
 import time
+from pathlib import Path
+
 import psutil
 
 
 CPU_WARNING_THRESHOLD = 80
 RAM_WARNING_THRESHOLD = 80
 DISK_WARNING_THRESHOLD = 80
+
+LOG_DIR = Path("logs")
+LOG_FILE = LOG_DIR / "monitor.log"
+
+
+def setup_logging():
+    LOG_DIR.mkdir(exist_ok=True)
+
+    logging.basicConfig(
+        filename=LOG_FILE,
+        level=logging.INFO,
+        format="%(asctime)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+
+def log_system_usage(cpu, ram, disk):
+    logging.info(
+        f"CPU={cpu:.1f}% | RAM={ram:.1f}% | DISK={disk:.1f}%"
+    )
 
 
 def get_system_info():
@@ -277,6 +300,12 @@ def parse_arguments():
         help="Refresh interval in seconds. Default: 5"
     )
 
+    parser.add_argument(
+        "--log",
+        action="store_true",
+        help="Enable local system usage logging."
+    )
+
     args = parser.parse_args()
 
     if args.interval <= 0:
@@ -291,6 +320,9 @@ def display_dashboard():
     print("=" * 55)
 
     cpu, ram, disk, uptime = get_system_info()
+
+    if logging.getLogger().hasHandlers():
+        log_system_usage(cpu, ram, disk)
 
     print("\nSYSTEM OVERVIEW")
     print("-" * 55)
@@ -318,6 +350,9 @@ def display_dashboard():
 
 if __name__ == "__main__":
     args = parse_arguments()
+
+    if args.log:
+        setup_logging()
 
     if args.watch:
         watch_mode(args.interval)
