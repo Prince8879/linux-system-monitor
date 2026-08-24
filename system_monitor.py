@@ -1,5 +1,6 @@
 ﻿import argparse
 import datetime
+import json
 import logging
 import time
 from pathlib import Path
@@ -7,12 +8,82 @@ from pathlib import Path
 import psutil
 
 
-CPU_WARNING_THRESHOLD = 80
-RAM_WARNING_THRESHOLD = 80
-DISK_WARNING_THRESHOLD = 80
+DEFAULT_CPU_WARNING_THRESHOLD = 80
+DEFAULT_RAM_WARNING_THRESHOLD = 80
+DEFAULT_DISK_WARNING_THRESHOLD = 80
+
+CONFIG_FILE = Path("config.json")
 
 LOG_DIR = Path("logs")
 LOG_FILE = LOG_DIR / "monitor.log"
+
+
+CPU_WARNING_THRESHOLD = DEFAULT_CPU_WARNING_THRESHOLD
+RAM_WARNING_THRESHOLD = DEFAULT_RAM_WARNING_THRESHOLD
+DISK_WARNING_THRESHOLD = DEFAULT_DISK_WARNING_THRESHOLD
+
+
+def load_config():
+    global CPU_WARNING_THRESHOLD
+    global RAM_WARNING_THRESHOLD
+    global DISK_WARNING_THRESHOLD
+
+    CPU_WARNING_THRESHOLD = DEFAULT_CPU_WARNING_THRESHOLD
+    RAM_WARNING_THRESHOLD = DEFAULT_RAM_WARNING_THRESHOLD
+    DISK_WARNING_THRESHOLD = DEFAULT_DISK_WARNING_THRESHOLD
+
+    if not CONFIG_FILE.exists():
+        return
+
+    try:
+        with CONFIG_FILE.open("r", encoding="utf-8-sig") as file:
+            config = json.load(file)
+
+        thresholds = config.get("thresholds", {})
+
+        cpu = thresholds.get(
+            "cpu",
+            DEFAULT_CPU_WARNING_THRESHOLD
+        )
+
+        ram = thresholds.get(
+            "ram",
+            DEFAULT_RAM_WARNING_THRESHOLD
+        )
+
+        disk = thresholds.get(
+            "disk",
+            DEFAULT_DISK_WARNING_THRESHOLD
+        )
+
+        if (
+            isinstance(cpu, (int, float))
+            and 0 < cpu <= 100
+        ):
+            CPU_WARNING_THRESHOLD = cpu
+
+        if (
+            isinstance(ram, (int, float))
+            and 0 < ram <= 100
+        ):
+            RAM_WARNING_THRESHOLD = ram
+
+        if (
+            isinstance(disk, (int, float))
+            and 0 < disk <= 100
+        ):
+            DISK_WARNING_THRESHOLD = disk
+
+    except (
+        OSError,
+        json.JSONDecodeError,
+        TypeError,
+        AttributeError,
+    ):
+        print(
+            "Warning: Unable to load config.json. "
+            "Using default thresholds."
+        )
 
 
 def setup_logging():
@@ -255,9 +326,20 @@ def check_warnings(cpu_usage, memory_usage, disk_usage):
     print("\nRESOURCE STATUS")
     print("-" * 55)
 
-    cpu_status = get_status(cpu_usage, CPU_WARNING_THRESHOLD)
-    ram_status = get_status(memory_usage, RAM_WARNING_THRESHOLD)
-    disk_status = get_status(disk_usage, DISK_WARNING_THRESHOLD)
+    cpu_status = get_status(
+        cpu_usage,
+        CPU_WARNING_THRESHOLD
+    )
+
+    ram_status = get_status(
+        memory_usage,
+        RAM_WARNING_THRESHOLD
+    )
+
+    disk_status = get_status(
+        disk_usage,
+        DISK_WARNING_THRESHOLD
+    )
 
     print(f"CPU Usage       : {cpu_usage:5.1f}%  [{cpu_status}]")
     print(f"RAM Usage       : {memory_usage:5.1f}%  [{ram_status}]")
@@ -350,6 +432,8 @@ def display_dashboard():
 
 if __name__ == "__main__":
     args = parse_arguments()
+
+    load_config()
 
     if args.log:
         setup_logging()
