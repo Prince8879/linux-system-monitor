@@ -31,6 +31,77 @@ def get_network_info():
                 print(f"{interface:<35}: {ip}")
 
 
+def get_process_info(limit=10):
+    processes = []
+
+    process_objects = []
+
+    for process in psutil.process_iter(
+        ["pid", "name", "memory_percent"]
+    ):
+        try:
+            name = process.info["name"] or "Unknown"
+
+            if name == "System Idle Process":
+                continue
+
+            process.cpu_percent(interval=None)
+            process_objects.append(process)
+
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    time.sleep(0.5)
+
+    cpu_count = psutil.cpu_count(logical=True) or 1
+
+    for process in process_objects:
+        try:
+            cpu_usage = process.cpu_percent(interval=None)
+
+            # Normalize process CPU usage to a 0-100% scale.
+            cpu_usage = cpu_usage / cpu_count
+
+            memory_usage = process.memory_percent()
+
+            processes.append(
+                {
+                    "pid": process.pid,
+                    "name": process.name() or "Unknown",
+                    "cpu": cpu_usage,
+                    "memory": memory_usage,
+                }
+            )
+
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    processes.sort(
+        key=lambda process: process["cpu"],
+        reverse=True
+    )
+
+    return processes[:limit]
+
+
+
+def display_processes(limit=10):
+    processes = get_process_info(limit)
+
+    print("\nPROCESS MONITOR")
+    print("-" * 55)
+    print(f"{'PID':<8}{'PROCESS':<25}{'CPU %':>10}{'RAM %':>10}")
+    print("-" * 55)
+
+    for process in processes:
+        print(
+            f"{process['pid']:<8}"
+            f"{process['name'][:24]:<25}"
+            f"{process['cpu']:>9.2f}%"
+            f"{process['memory']:>9.2f}%"
+        )
+
+
 def get_status(usage):
     if usage > 80:
         return "WARNING"
@@ -112,6 +183,8 @@ def display_dashboard():
     get_network_info()
 
     check_warnings(cpu, ram, disk)
+
+    display_processes(10)
 
     print("\n" + "=" * 55)
 
