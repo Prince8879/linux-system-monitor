@@ -23,7 +23,11 @@ def get_system_info():
 
 
 def get_network_info():
-    network_info = psutil.net_if_addrs()
+    try:
+        network_info = psutil.net_if_addrs()
+    except (OSError, AttributeError):
+        print("Unable to read network interface information.")
+        return
 
     for interface, addresses in network_info.items():
         for address in addresses:
@@ -37,14 +41,31 @@ def get_network_info():
 
 
 def get_network_stats():
-    stats = psutil.net_io_counters()
+    try:
+        stats = psutil.net_io_counters()
 
-    return {
-        "bytes_sent": stats.bytes_sent,
-        "bytes_received": stats.bytes_recv,
-        "packets_sent": stats.packets_sent,
-        "packets_received": stats.packets_recv,
-    }
+        if stats is None:
+            return {
+                "bytes_sent": 0,
+                "bytes_received": 0,
+                "packets_sent": 0,
+                "packets_received": 0,
+            }
+
+        return {
+            "bytes_sent": stats.bytes_sent,
+            "bytes_received": stats.bytes_recv,
+            "packets_sent": stats.packets_sent,
+            "packets_received": stats.packets_recv,
+        }
+
+    except (OSError, AttributeError):
+        return {
+            "bytes_sent": 0,
+            "bytes_received": 0,
+            "packets_sent": 0,
+            "packets_received": 0,
+        }
 
 
 def format_bytes(value):
@@ -74,16 +95,36 @@ def display_network_stats():
 
 
 def get_network_rates(interval=1):
-    start = psutil.net_io_counters()
+    if interval <= 0:
+        return 0, 0
 
-    time.sleep(interval)
+    try:
+        start = psutil.net_io_counters()
 
-    end = psutil.net_io_counters()
+        if start is None:
+            return 0, 0
 
-    upload_rate = (end.bytes_sent - start.bytes_sent) / interval
-    download_rate = (end.bytes_recv - start.bytes_recv) / interval
+        time.sleep(interval)
 
-    return upload_rate, download_rate
+        end = psutil.net_io_counters()
+
+        if end is None:
+            return 0, 0
+
+        upload_rate = max(
+            0,
+            (end.bytes_sent - start.bytes_sent) / interval
+        )
+
+        download_rate = max(
+            0,
+            (end.bytes_recv - start.bytes_recv) / interval
+        )
+
+        return upload_rate, download_rate
+
+    except (OSError, AttributeError):
+        return 0, 0
 
 
 def display_network_rates(interval=1):
@@ -97,8 +138,10 @@ def display_network_rates(interval=1):
 
 
 def get_process_info(limit=10):
-    processes = []
+    if limit <= 0:
+        return []
 
+    processes = []
     process_objects = []
 
     for process in psutil.process_iter(
@@ -113,7 +156,11 @@ def get_process_info(limit=10):
             process.cpu_percent(interval=None)
             process_objects.append(process)
 
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+        except (
+            psutil.NoSuchProcess,
+            psutil.AccessDenied,
+            psutil.ZombieProcess,
+        ):
             continue
 
     time.sleep(0.5)
@@ -124,6 +171,7 @@ def get_process_info(limit=10):
         try:
             cpu_usage = process.cpu_percent(interval=None)
 
+            # Normalize process CPU usage to a 0-100% scale.
             cpu_usage = cpu_usage / cpu_count
 
             memory_usage = process.memory_percent()
@@ -137,7 +185,11 @@ def get_process_info(limit=10):
                 }
             )
 
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+        except (
+            psutil.NoSuchProcess,
+            psutil.AccessDenied,
+            psutil.ZombieProcess,
+        ):
             continue
 
     processes.sort(
