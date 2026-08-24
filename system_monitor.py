@@ -2,6 +2,7 @@
 import datetime
 import json
 import logging
+import platform
 import time
 from pathlib import Path
 
@@ -36,7 +37,10 @@ def load_config():
         return
 
     try:
-        with CONFIG_FILE.open("r", encoding="utf-8-sig") as file:
+        with CONFIG_FILE.open(
+            "r",
+            encoding="utf-8-sig"
+        ) as file:
             config = json.load(file)
 
         thresholds = config.get("thresholds", {})
@@ -103,17 +107,51 @@ def log_system_usage(cpu, ram, disk):
     )
 
 
+def format_bytes(value):
+    units = ["B", "KB", "MB", "GB", "TB"]
+
+    size = float(value)
+
+    for unit in units:
+        if size < 1024:
+            return f"{size:.2f} {unit}"
+
+        size /= 1024
+
+    return f"{size:.2f} PB"
+
+
 def get_system_info():
     cpu_usage = psutil.cpu_percent(interval=1)
+
     memory = psutil.virtual_memory()
     disk = psutil.disk_usage("/")
 
-    boot_time = datetime.datetime.fromtimestamp(psutil.boot_time())
+    boot_time = datetime.datetime.fromtimestamp(
+        psutil.boot_time()
+    )
+
     current_time = datetime.datetime.now()
+
     uptime = current_time - boot_time
     uptime = str(uptime).split(".")[0]
 
-    return cpu_usage, memory.percent, disk.percent, uptime
+    return {
+        "cpu": cpu_usage,
+        "ram": memory.percent,
+        "disk": disk.percent,
+        "uptime": uptime,
+        "cpu_cores": psutil.cpu_count(logical=True) or 1,
+        "ram_total": memory.total,
+        "ram_used": memory.used,
+        "ram_available": memory.available,
+        "disk_total": disk.total,
+        "disk_used": disk.used,
+        "disk_free": disk.free,
+        "os": platform.system(),
+        "os_release": platform.release(),
+        "machine": platform.machine(),
+    }
 
 
 def get_network_info():
@@ -162,30 +200,31 @@ def get_network_stats():
         }
 
 
-def format_bytes(value):
-    units = ["B", "KB", "MB", "GB", "TB"]
-
-    size = float(value)
-
-    for unit in units:
-        if size < 1024:
-            return f"{size:.2f} {unit}"
-
-        size /= 1024
-
-    return f"{size:.2f} PB"
-
-
 def display_network_stats():
     stats = get_network_stats()
 
     print("\nNETWORK STATISTICS")
     print("-" * 55)
 
-    print(f"{'Bytes Sent':<25}: {format_bytes(stats['bytes_sent'])}")
-    print(f"{'Bytes Received':<25}: {format_bytes(stats['bytes_received'])}")
-    print(f"{'Packets Sent':<25}: {stats['packets_sent']:,}")
-    print(f"{'Packets Received':<25}: {stats['packets_received']:,}")
+    print(
+        f"{'Bytes Sent':<25}: "
+        f"{format_bytes(stats['bytes_sent'])}"
+    )
+
+    print(
+        f"{'Bytes Received':<25}: "
+        f"{format_bytes(stats['bytes_received'])}"
+    )
+
+    print(
+        f"{'Packets Sent':<25}: "
+        f"{stats['packets_sent']:,}"
+    )
+
+    print(
+        f"{'Packets Received':<25}: "
+        f"{stats['packets_received']:,}"
+    )
 
 
 def get_network_rates(interval=1):
@@ -227,8 +266,15 @@ def display_network_rates(interval=1):
     print("\nNETWORK SPEED")
     print("-" * 55)
 
-    print(f"Upload Rate   : {format_bytes(upload_rate)}/s")
-    print(f"Download Rate : {format_bytes(download_rate)}/s")
+    print(
+        f"Upload Rate   : "
+        f"{format_bytes(upload_rate)}/s"
+    )
+
+    print(
+        f"Download Rate : "
+        f"{format_bytes(download_rate)}/s"
+    )
 
 
 def get_process_info(limit=10):
@@ -263,9 +309,10 @@ def get_process_info(limit=10):
 
     for process in process_objects:
         try:
-            cpu_usage = process.cpu_percent(interval=None)
+            cpu_usage = process.cpu_percent(
+                interval=None
+            )
 
-            # Normalize process CPU usage to a 0-100% scale.
             cpu_usage = cpu_usage / cpu_count
 
             memory_usage = process.memory_percent()
@@ -299,7 +346,14 @@ def display_processes(limit=10):
 
     print("\nPROCESS MONITOR")
     print("-" * 55)
-    print(f"{'PID':<8}{'PROCESS':<25}{'CPU %':>10}{'RAM %':>10}")
+
+    print(
+        f"{'PID':<8}"
+        f"{'PROCESS':<25}"
+        f"{'CPU %':>10}"
+        f"{'RAM %':>10}"
+    )
+
     print("-" * 55)
 
     for process in processes:
@@ -316,13 +370,19 @@ def get_status(usage, warning_threshold=80):
 
     if usage > warning_threshold:
         return "WARNING"
+
     elif usage >= notice_threshold:
         return "NOTICE"
+
     else:
         return "OK"
 
 
-def check_warnings(cpu_usage, memory_usage, disk_usage):
+def check_warnings(
+    cpu_usage,
+    memory_usage,
+    disk_usage
+):
     print("\nRESOURCE STATUS")
     print("-" * 55)
 
@@ -341,15 +401,82 @@ def check_warnings(cpu_usage, memory_usage, disk_usage):
         DISK_WARNING_THRESHOLD
     )
 
-    print(f"CPU Usage       : {cpu_usage:5.1f}%  [{cpu_status}]")
-    print(f"RAM Usage       : {memory_usage:5.1f}%  [{ram_status}]")
-    print(f"Disk Usage      : {disk_usage:5.1f}%  [{disk_status}]")
+    print(
+        f"CPU Usage       : "
+        f"{cpu_usage:5.1f}%  [{cpu_status}]"
+    )
+
+    print(
+        f"RAM Usage       : "
+        f"{memory_usage:5.1f}%  [{ram_status}]"
+    )
+
+    print(
+        f"Disk Usage      : "
+        f"{disk_usage:5.1f}%  [{disk_status}]"
+    )
+
+
+def display_system_details(info):
+    print("\nSYSTEM DETAILS")
+    print("-" * 55)
+
+    print(
+        f"{'Operating System':<25}: "
+        f"{info['os']}"
+    )
+
+    print(
+        f"{'OS Release':<25}: "
+        f"{info['os_release']}"
+    )
+
+    print(
+        f"{'Machine':<25}: "
+        f"{info['machine']}"
+    )
+
+    print(
+        f"{'Logical CPU Cores':<25}: "
+        f"{info['cpu_cores']}"
+    )
+
+    print(
+        f"{'RAM Total':<25}: "
+        f"{format_bytes(info['ram_total'])}"
+    )
+
+    print(
+        f"{'RAM Used':<25}: "
+        f"{format_bytes(info['ram_used'])}"
+    )
+
+    print(
+        f"{'RAM Available':<25}: "
+        f"{format_bytes(info['ram_available'])}"
+    )
+
+    print(
+        f"{'Disk Total':<25}: "
+        f"{format_bytes(info['disk_total'])}"
+    )
+
+    print(
+        f"{'Disk Used':<25}: "
+        f"{format_bytes(info['disk_used'])}"
+    )
+
+    print(
+        f"{'Disk Free':<25}: "
+        f"{format_bytes(info['disk_free'])}"
+    )
 
 
 def watch_mode(interval):
     try:
         while True:
             print("\033[2J\033[H")
+
             display_dashboard()
 
             print(
@@ -391,7 +518,9 @@ def parse_arguments():
     args = parser.parse_args()
 
     if args.interval <= 0:
-        parser.error("interval must be greater than 0")
+        parser.error(
+            "interval must be greater than 0"
+        )
 
     return args
 
@@ -401,18 +530,44 @@ def display_dashboard():
     print("             LINUX SYSTEM MONITOR")
     print("=" * 55)
 
-    cpu, ram, disk, uptime = get_system_info()
+    info = get_system_info()
+
+    cpu = info["cpu"]
+    ram = info["ram"]
+    disk = info["disk"]
+    uptime = info["uptime"]
 
     if logging.getLogger().hasHandlers():
-        log_system_usage(cpu, ram, disk)
+        log_system_usage(
+            cpu,
+            ram,
+            disk
+        )
 
     print("\nSYSTEM OVERVIEW")
     print("-" * 55)
 
-    print(f"CPU Usage       : {cpu:5.1f}%")
-    print(f"RAM Usage       : {ram:5.1f}%")
-    print(f"Disk Usage      : {disk:5.1f}%")
-    print(f"System Uptime   : {uptime}")
+    print(
+        f"CPU Usage       : "
+        f"{cpu:5.1f}%"
+    )
+
+    print(
+        f"RAM Usage       : "
+        f"{ram:5.1f}%"
+    )
+
+    print(
+        f"Disk Usage      : "
+        f"{disk:5.1f}%"
+    )
+
+    print(
+        f"System Uptime   : "
+        f"{uptime}"
+    )
+
+    display_system_details(info)
 
     print("\nNETWORK")
     print("-" * 55)
@@ -423,7 +578,11 @@ def display_dashboard():
 
     display_network_rates(1)
 
-    check_warnings(cpu, ram, disk)
+    check_warnings(
+        cpu,
+        ram,
+        disk
+    )
 
     display_processes(10)
 
@@ -440,5 +599,6 @@ if __name__ == "__main__":
 
     if args.watch:
         watch_mode(args.interval)
+
     else:
         display_dashboard()
